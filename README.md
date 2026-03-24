@@ -158,15 +158,18 @@ crypto-data/
 ├── README.md                             # Este arquivo
 ├── requirements.txt                      # Dependências Python
 │
-├── services/                             # Camada de Serviços
-│   ├── binance_market_data_service.py   # Requisições de dados de mercado
-│   ├── binance_account_history_service.py # Requisições de conta
-│   └── services_manager.py               # Factory de serviços
 │
 ├── controllers/                          # Camada de Controladores
-│   ├── market_data_controller.py        # Transformação de dados de mercado
-│   ├── account_history_controller.py    # Transformação de dados de conta
+│   ├── market_data_controller.py        # Orquestracao de chamada aos service dados de mercado
+│   ├── account_history_controller.py    # Orquestracao de chamada aos service de dados de conta
 │   └── controllers_manager.py            # Factory de controladores
+│
+│
+├── services/                             # Camada de Serviços
+│   ├── binance_market_data_service.py   # Requisições de dados de mercado e transformação de dados de mercado
+│   ├── binance_account_history_service.py # Requisições de conta e transformação de dados de conta
+│   └── services_manager.py               # Factory de serviços
+│
 │
 └── env/                                  # Configuração
     ├── keys.py                           # Chaves 
