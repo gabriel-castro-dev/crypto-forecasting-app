@@ -1,10 +1,9 @@
 import logging
 import time
 from typing import Optional
-from app.config import BINANCE_API_KEY, BINANCE_API_SECRET
+from app.config import settings
 from binance.client import Client
 from binance.enums import *
-from config import MAX_RETRIES, RETRY_DELAY
 
 logger = logging.getLogger(__name__)
 
@@ -30,69 +29,73 @@ class BinanceClient:
             RuntimeError: Se não conseguir conectar à API Binance
         """
         try:
-            self.api_key: str = BINANCE_API_KEY
-            self.api_secret: str = BINANCE_API_SECRET
+            self.api_key: str = settings.BINANCE_API_KEY
+            self.api_secret: str = settings.BINANCE_API_SECRET
             self.client: Client = Client(self.api_key, self.api_secret, testnet=True)
+            self.MAX_RETRIES = settings.MAX_RETRIES
+            self.RETRY_DELAY = settings.RETRY_DELAY
             logger.info("BinanceClient inicializado com sucesso")
         except Exception as e:
             logger.error(f"Falha crítica ao conectar na API: {e}")
             raise RuntimeError(f"Falha crítica: Não foi possível conectar à API. Erro: {e}")
 
-    def ping(self) -> str:
+    def ping(self) -> bool:
         """
         Verifica conectividade com a API Binance.
         
         Returns:
-            Mensagem indicando status da conexão
+            Bool indicando status da conexão
         """
         try:
             resultado = self.client.ping()
             if resultado == {}:
                 logger.debug("API Binance está acessível")
-                return "Binance API is reachable."
-            else:
-                logger.warning(f"Erro ao fazer ping: {resultado}")
-                return resultado
+                return True
+            
+            logger.warning(f"Erro inesperado ao fazer ping: {resultado}")
+            return False
+        
         except Exception as e:
             logger.error(f"Erro ao fazer ping na API: {e}")
-            return f"Error pinging Binance API: {e}"
+            return False
+        
 
-    def server_time(self) -> dict:
+    def server_time(self) -> dict | None:
         """
         Obtém o horário atual do servidor Binance.
         
         Returns:
-            Dict com timestamp ou mensagem de erro
+            Dict com timestamp ou None se falhar
         """
         try:
             data = self.client.get_server_time()
             return data
         except Exception as e:
             logger.error(f"Erro ao obter tempo do servidor: {e}")
-            return f"Error getting server time: {e}"
+            return None
 
-    def system_status(self) -> dict:
+    def system_status(self) -> dict | None:
         """
         Obtém status do sistema Binance.
         
         Returns:
-            Dict com status ou mensagem de erro
+            Dict com status ou None se falhar
         """
         try:
             data = self.client.get_system_status()
             return data
         except Exception as e:
             logger.error(f"Erro ao obter status do sistema: {e}")
-            return f"Error getting system status: {e}"
+            return None
 
     def get_tickers(self) -> list:
         """
-        Obtém lista de todos os tickers com pares USDT, ordenados por preço.
+        Obtém lista de todos os tickers do mercado, ordenados por preço.
         
         Returns:
-            Lista com tickers USDT ordenados ou dicionário vazio se falhar
+            Lista com tickers do mercado ou lista vazia se falhar
         """
-        for attempt in range(MAX_RETRIES):
+        for attempt in range(self.MAX_RETRIES):
             try:
                 data = self.client.get_all_tickers()
                 if isinstance(data, list) and len(data) > 0:
@@ -102,23 +105,23 @@ class BinanceClient:
                 if "APIError(code=-2015)" in error_msg:
                     logger.error("Erro de permissão ao obter tickers")
                     raise PermissionError(f"Failed to retrieve tickers, user doesn't have permission to do this request.")
-                logger.warning(f"[Tentativa {attempt + 1}/{MAX_RETRIES}] {error_msg}")
-                if attempt < MAX_RETRIES - 1:
-                    logger.warning(f"Aguardando {RETRY_DELAY}s para retry...")
-                    time.sleep(RETRY_DELAY)
+                logger.warning(f"[Tentativa {attempt + 1}/{self.MAX_RETRIES}] {error_msg}")
+                if attempt < self.MAX_RETRIES - 1:
+                    logger.warning(f"Aguardando {self.RETRY_DELAY}s para retry...")
+                    time.sleep(self.RETRY_DELAY)
 
         logger.error("Falha ao obter tickers após todas as tentativas")
         return []
 
-    def get_ticker_24hr(self, symbol: str) -> list | dict:
+    def get_ticker_24hr(self, symbol: str) -> dict:
         """
-        Obtém dados de 24h dos pares USDT.
+        Obtém dados de 24h do par USDT.
         
         Returns:
-            Lista com dados 24h ou dicionário vazio se falhar
+            Dicionário com dados 24h ou dicionário vazio se falhar
         """
 
-        for attempt in range(MAX_RETRIES):
+        for attempt in range(self.MAX_RETRIES):
             try:
                 data = self.client.get_ticker(symbol=symbol)
                 if isinstance(data, dict):
@@ -134,25 +137,25 @@ class BinanceClient:
                 logger.warning(f"Erro para {symbol}: {error_msg}")
             except Exception as e:
                 error_msg = str(e)
-                logger.warning(f"[Tentativa {attempt + 1}/{MAX_RETRIES}] Erro: {error_msg}")
-                if attempt < MAX_RETRIES - 1:
-                    time.sleep(RETRY_DELAY)
+                logger.warning(f"[Tentativa {attempt + 1}/{self.MAX_RETRIES}] Erro: {error_msg}")
+                if attempt < self.MAX_RETRIES - 1:
+                    time.sleep(self.RETRY_DELAY)
 
         logger.error("Falha ao obter dados 24h após todas as tentativas")
         return {}
 
-    def get_orderbook_tickers(self, symbol: str) -> list:
+    def get_orderbook_tickers(self, symbol: str | list) -> list:
         """
         Obtém informações de order book de um par.
         
         Args:
-            symbol: Par de moedas (ex: 'BTCUSDT')
+            symbol: Par de moedas (ex: 'BTCUSDT') ou lista de pares (ex: ['BTCUSDT', 'ETHUSDT'])
         
         Returns:
             Lista com dados de order book ou lista vazia se falhar
         """
 
-        for attempt in range(MAX_RETRIES):
+        for attempt in range(self.MAX_RETRIES):
             try:
                 data = self.client.get_orderbook_tickers(symbol=symbol)
                 if isinstance(data, list):
@@ -165,9 +168,9 @@ class BinanceClient:
                 if "APIError(code=-1100)" in error_msg or "APIError(code=-1121)" in error_msg:
                     logger.error(f"Símbolo inválido: {symbol}")
                     raise KeyError(f"Failed to retrieve orderbook tickers for {symbol}, invalid symbol provided.")
-                logger.warning(f"[Tentativa {attempt + 1}/{MAX_RETRIES}] {error_msg}")
-                if attempt < MAX_RETRIES - 1:
-                    time.sleep(RETRY_DELAY)
+                logger.warning(f"[Tentativa {attempt + 1}/{self.MAX_RETRIES}] {error_msg}")
+                if attempt < self.MAX_RETRIES - 1:
+                    time.sleep(self.RETRY_DELAY)
 
         logger.error(f"Falha ao obter order book para {symbol}")
         return []
@@ -183,7 +186,7 @@ class BinanceClient:
         Returns:
             Lista com K-lines ou lista vazia se falhar
         """
-        for attempt in range(MAX_RETRIES):
+        for attempt in range(self.MAX_RETRIES):
             try:
                 data = self.client.get_klines(symbol=symbol, interval=interval)
                 if isinstance(data, list) and len(data) > 0:
@@ -196,9 +199,9 @@ class BinanceClient:
                 if "APIError(code=-1100)" in error_msg or "APIError(code=-1121)" in error_msg:
                     logger.error(f"Parâmetro inválido para {symbol}")
                     raise KeyError(f"Failed to retrieve klines for {symbol}, invalid parameter provided.")
-                logger.warning(f"[Tentativa {attempt + 1}/{MAX_RETRIES}] {error_msg}")
-                if attempt < MAX_RETRIES - 1:
-                    time.sleep(RETRY_DELAY)
+                logger.warning(f"[Tentativa {attempt + 1}/{self.MAX_RETRIES}] {error_msg}")
+                if attempt < self.MAX_RETRIES - 1:
+                    time.sleep(self.RETRY_DELAY)
 
         logger.error(f"Falha ao obter k-lines para {symbol}")
         return []
@@ -218,7 +221,7 @@ class BinanceClient:
         Returns:
             Lista com k-lines históricas ou lista vazia se falhar
         """
-        for attempt in range(MAX_RETRIES):
+        for attempt in range(self.MAX_RETRIES):
             try:
                 data = self.client.get_historical_klines(symbol=symbol, interval=interval,
                                                     start_str=start_str, end_str=end_str, limit=limit)
@@ -232,9 +235,9 @@ class BinanceClient:
                 if "APIError(code=-1100)" in error_msg or "APIError(code=-1121)" in error_msg:
                     logger.error("Parâmetro inválido em k-lines históricas")
                     raise KeyError("Failed to retrieve historical klines, invalid parameter provided.")
-                logger.warning(f"[Tentativa {attempt + 1}/{MAX_RETRIES}] {error_msg}")
-                if attempt < MAX_RETRIES - 1:
-                    time.sleep(RETRY_DELAY)
+                logger.warning(f"[Tentativa {attempt + 1}/{self.MAX_RETRIES}] {error_msg}")
+                if attempt < self.MAX_RETRIES - 1:
+                    time.sleep(self.RETRY_DELAY)
 
         logger.error(f"Falha ao obter k-lines históricas para {symbol}")
         return []
@@ -251,7 +254,7 @@ class BinanceClient:
         Returns:
             Lista com k-lines geradas ou lista vazia se falhar
         """
-        for attempt in range(MAX_RETRIES):
+        for attempt in range(self.MAX_RETRIES):
             try:
                 data = list(self.client.get_historical_klines_generator(symbol=symbol, interval=interval,
                                                                        start_str=timestamp))
@@ -265,9 +268,9 @@ class BinanceClient:
                 if "APIError(code=-1100)" in error_msg or "APIError(code=-1121)" in error_msg:
                     logger.error("Parâmetro inválido em generator de k-lines")
                     raise KeyError("Failed to retrieve historical klines generator, invalid parameter provided.")
-                logger.warning(f"[Tentativa {attempt + 1}/{MAX_RETRIES}] {error_msg}")
-                if attempt < MAX_RETRIES - 1:
-                    time.sleep(RETRY_DELAY)
+                logger.warning(f"[Tentativa {attempt + 1}/{self.MAX_RETRIES}] {error_msg}")
+                if attempt < self.MAX_RETRIES - 1:
+                    time.sleep(self.RETRY_DELAY)
 
         logger.error(f"Falha ao gerar k-lines históricas para {symbol}")
         return []
@@ -282,7 +285,7 @@ class BinanceClient:
         Returns:
             Dicionário com preço médio ou dicionário vazio se falhar
         """
-        for attempt in range(MAX_RETRIES):
+        for attempt in range(self.MAX_RETRIES):
             try:
                 data = self.client.get_avg_price(symbol=symbol)
                 if isinstance(data, dict):
@@ -295,9 +298,9 @@ class BinanceClient:
                 if "APIError(code=-1100)" in error_msg or "APIError(code=-1121)" in error_msg:
                     logger.error(f"Símbolo inválido: {symbol}")
                     raise KeyError(f"Failed to retrieve average prices for {symbol}, invalid symbol provided.")
-                logger.warning(f"[Tentativa {attempt + 1}/{MAX_RETRIES}] {error_msg}")
-                if attempt < MAX_RETRIES - 1:
-                    time.sleep(RETRY_DELAY)
+                logger.warning(f"[Tentativa {attempt + 1}/{self.MAX_RETRIES}] {error_msg}")
+                if attempt < self.MAX_RETRIES - 1:
+                    time.sleep(self.RETRY_DELAY)
 
         logger.error(f"Falha ao obter preço médio para {symbol}")
         return {}
@@ -313,7 +316,7 @@ class BinanceClient:
         Returns:
             Lista com trades recentes ou lista vazia se falhar
         """
-        for attempt in range(MAX_RETRIES):
+        for attempt in range(self.MAX_RETRIES):
             try:
                 data = self.client.get_recent_trades(symbol=symbol, limit=limit)
                 if isinstance(data, list) or isinstance(data, dict):
@@ -326,9 +329,9 @@ class BinanceClient:
                 if "APIError(code=-1100)" in error_msg or "APIError(code=-1121)" in error_msg:
                     logger.error(f"Símbolo inválido: {symbol}")
                     raise KeyError(f"Failed to retrieve recent trades for {symbol}, invalid symbol provided.")
-                logger.warning(f"[Tentativa {attempt + 1}/{MAX_RETRIES}] {error_msg}")
-                if attempt < MAX_RETRIES - 1:
-                    time.sleep(RETRY_DELAY)
+                logger.warning(f"[Tentativa {attempt + 1}/{self.MAX_RETRIES}] {error_msg}")
+                if attempt < self.MAX_RETRIES - 1:
+                    time.sleep(self.RETRY_DELAY)
 
         logger.error(f"Falha ao obter trades recentes para {symbol}")
         return []
@@ -343,7 +346,7 @@ class BinanceClient:
         Returns:
             Lista com trades históricos ou lista vazia se falhar
         """
-        for attempt in range(MAX_RETRIES):
+        for attempt in range(self.MAX_RETRIES):
             try:
                 data = self.client.get_historical_trades(symbol=symbol)
                 if isinstance(data, list) or isinstance(data, dict):
@@ -356,9 +359,9 @@ class BinanceClient:
                 if "APIError(code=-1100)" in error_msg or "APIError(code=-1121)" in error_msg:
                     logger.error(f"Símbolo inválido: {symbol}")
                     raise KeyError(f"Failed to retrieve historical trades for {symbol}, invalid symbol provided.")
-                logger.warning(f"[Tentativa {attempt + 1}/{MAX_RETRIES}] {error_msg}")
-                if attempt < MAX_RETRIES - 1:
-                    time.sleep(RETRY_DELAY)
+                logger.warning(f"[Tentativa {attempt + 1}/{self.MAX_RETRIES}] {error_msg}")
+                if attempt < self.MAX_RETRIES - 1:
+                    time.sleep(self.RETRY_DELAY)
 
         logger.error(f"Falha ao obter trades históricos para {symbol}")
         return []
@@ -373,7 +376,7 @@ class BinanceClient:
         Returns:
             Lista com trades agregados ou lista vazia se falhar
         """
-        for attempt in range(MAX_RETRIES):
+        for attempt in range(self.MAX_RETRIES):
             try:
                 data = self.client.get_aggregate_trades(symbol=symbol)
                 if isinstance(data, list):
@@ -386,9 +389,9 @@ class BinanceClient:
                 if "APIError(code=-1100)" in error_msg or "APIError(code=-1121)" in error_msg:
                     logger.error(f"Símbolo inválido: {symbol}")
                     raise KeyError(f"Failed to retrieve aggregate trades for {symbol}, invalid symbol provided.")
-                logger.warning(f"[Tentativa {attempt + 1}/{MAX_RETRIES}] {error_msg}")
-                if attempt < MAX_RETRIES - 1:
-                    time.sleep(RETRY_DELAY)
+                logger.warning(f"[Tentativa {attempt + 1}/{self.MAX_RETRIES}] {error_msg}")
+                if attempt < self.MAX_RETRIES - 1:
+                    time.sleep(self.RETRY_DELAY)
 
         logger.error(f"Falha ao obter trades agregados para {symbol}")
         return []
@@ -402,7 +405,7 @@ class BinanceClient:
         Returns:
             Dicionário com profundidade ou dicionário vazio se falhar
         """
-        for attempt in range(MAX_RETRIES):
+        for attempt in range(self.MAX_RETRIES):
             try:
                 data = self.client.get_order_book(symbol=symbol)
                 if isinstance(data, dict):
@@ -415,9 +418,9 @@ class BinanceClient:
                 if "APIError(code=-1100)" in error_msg or "APIError(code=-1121)" in error_msg:
                     logger.error(f"Símbolo inválido: {symbol}")
                     raise KeyError(f"Failed to get depth for {symbol}, invalid symbol provided.")
-                logger.warning(f"[Tentativa {attempt + 1}/{MAX_RETRIES}] {error_msg}")
-                if attempt < MAX_RETRIES - 1:
-                    time.sleep(RETRY_DELAY)
+                logger.warning(f"[Tentativa {attempt + 1}/{self.MAX_RETRIES}] {error_msg}")
+                if attempt < self.MAX_RETRIES - 1:
+                    time.sleep(self.RETRY_DELAY)
 
         logger.error(f"Falha ao obter profundidade de mercado para {symbol}")
         return {}
