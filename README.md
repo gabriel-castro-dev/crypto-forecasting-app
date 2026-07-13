@@ -1,204 +1,136 @@
-# Explorador de Mercado Binance - EDA
+# Plataforma de Engenharia de Dados, ML & Visualização - Mercado Binance
 
-Sistema de Análise Exploratória de Dados (EDA) do mercado de criptomoedas com arquitetura em camadas, extraindo informações da API Binance, transformando e estruturando dados em DataFrames para análise detalhada.
+Plataforma ponta a ponta (End-to-End) para coleta automatizada, armazenamento persistente, previsão de preços com Machine Learning e exibição de indicadores do mercado de criptomoedas através de dashboards interativos.
 
-**Projeto desenvolvido para demonstrar:** Manipulação avançada de dados, arquitetura em camadas, integração com APIs REST e boas práticas em Python.
-
-## Status
-
--  **Implementado**: Serviços, Controllers e lógica de requisições
--  **Em Desenvolvimento**: Exportação para XLSX e análise de dados com BI
+**Evolução do Projeto:** O sistema nasceu como um pipeline local de Análise Exploratória de Dados (EDA) focado em logs de terminal e planilhas CSV. A arquitetura atual transforma esse escopo inicial em um ecossistema robusto de dados baseado em microsserviços, APIs REST e automação via CI/CD.
 
 ---
 
-##  Arquitetura
+## Arquitetura do Sistema
 
-Projeto estruturado em **3 camadas** seguindo o padrão de separação de responsabilidades:
-
-```
-┌─────────────────────────────────────┐
-│       main.py (Execução)            │
-└────────────────┬────────────────────┘
-                 │
-┌────────────────▼─────────────────────────────────┐
-│  Controllers (Orquestracao)                      │
-│  • market_data_controller.py                     │
-│  • account_history_controller.py                 │
-│  • controllers_manager.py                        │
-└────────────────┬────────────────────────────────┘
-                 │
-┌────────────────▼─────────────────────────────────┐
-│  Services (Logica de Negocio)                   │
-│  • binance_market_data_service.py               │
-│  • binance_account_history_service.py           │
-│  • services_manager.py                          │
-└────────────────┬────────────────────────────────┘
-                 │
-┌────────────────▼────────────────────────────────┐
-│  Environment & Configuracao                     │
-│  • env/keys.py (Credenciais & API Keys)         │
-└─────────────────────────────────────────────────┘
-```
-
-### Responsabilidades por Camada
-
-| Camada | Responsabilidade | Arquivos |
-|--------|-----------------|----------|
-| **Services** | Requisicoes a API Binance, transformacao em DataFrames, tratamento de erros, retry logic, validacao de dados | `binance_*_service.py` |
-| **Controllers** | Orquestracao de chamadas aos services, delegacao de responsabilidades | `*_controller.py` |
-| **Managers** | Factory Pattern - Centraliza instanciacao de dependencias com injecao de dependencias | `*_manager.py` |
-| **Environment** | Isolamento de credenciais e configuracoes sensiveis | `env/keys.py` |
-
----
-
-##  Funcionalidades Implementadas
-
-### Dados de Mercado (`MarketDataController`)
--  Ticker 24h de pares de criptomoedas
--  Volume de ordem (order book)
--  K-lines (velas) - Tempo real e histórico
--  Preço médio
--  Trades recentes e históricos
--  Agregação de trades
--  Profundidade de mercado (depth)
-
-### Dados de Conta (`AccountHistoryController`)
--  Informações de saldo da conta
--  Status da conta
--  Status de trading da API
--  Histórico de trades executados
--  Histórico de dividendos
--  Ordens (todas, em aberto, etc)
--  Saldo de ativos específicos
-
----
-
-## Instalação & Configuração
-
-### Pré-requisitos
-- Python 3.8+
-- pip
-
-### 1. Clonar o repositório
-```bash
-git clone https://github.com/gabriel-castro-dev/Explorador-de-Mercado-Binance-EDA
-cd Explorador-de-Mercado-Binance-EDA
-```
-
-### 2. Criar ambiente virtual
-```bash
-python -m venv venv
-
-# Windows
-venv\Scripts\activate
-
-# Linux/Mac
-source venv/bin/activate
-```
-
-### 3. Instalar dependências
-```bash
-pip install -r requirements.txt
-```
-
-### 4. Configurar credenciais
-Copie o arquivo exemplo e adicione suas chaves:
-```bash
-cp env/examplekeys.py env/keys.py
-```
-
-Edite `env/keys.py`:
-```python
-BINANCE_API_KEY = "sua_chave_de_api_aqui"
-BINANCE_API_SECRET = "seu_secret_aqui"
-```
-
-### 5. Executar
-```bash
-python main.py
-```
-
----
-
-## Exemplo de Uso
-
-```python
-from controllers.controllers_manager import ControllersManager
-import pandas as pd
-
-# Instanciar managers
-controllers_manager = ControllersManager()
-market_data, account_history = controllers_manager.export_controllers()
-
-# Obter dados de mercado
-symbol = 'BTCUSDT'
-ticker_data = market_data.get_ticker_24hr(symbol)
-print(ticker_data)
-
-# Obter histórico da conta
-account_balances = account_history.account_info()
-print(account_balances)
-
-# Obter K-lines histórico
-klines = market_data.get_historical_klines(
-    symbol='ETUSDT',
-    interval='1h',
-    start_str='30 days ago UTC'
-)
-print(klines)
-```
-
----
-
-## Estrutura de Arquivos
+O projeto adota o modelo de **Monorepo**, segregando responsabilidades desde a coleta diária até a entrega de valor na interface do usuário.
 
 ```
-crypto-data/
-├── main.py                               # Ponto de entrada
-├── README.md                             # Este arquivo
-├── requirements.txt                      # Dependências Python
+Binance API
 │
+▼
+Pipeline de Coleta (GitHub Actions)
 │
-├── controllers/                          # Camada de Controladores
-│   ├── market_data_controller.py        # Orquestracao de chamada aos service dados de mercado
-│   ├── account_history_controller.py    # Orquestracao de chamada aos service de dados de conta
-│   └── controllers_manager.py            # Factory de controladores
+▼
+Supabase (PostgreSQL)
 │
+├──────────────────────────────┐
+▼                              ▼
+FastAPI (REST API)           Machine Learning (Treinamento/Métricas)
+│                              │
+└──────────────┬───────────────┘
+▼
+React Dashboard (Vercel)
 │
-├── services/                             # Camada de Serviços
-│   ├── binance_market_data_service.py   # Requisições de dados de mercado e transformação de dados de mercado
-│   ├── binance_account_history_service.py # Requisições de conta e transformação de dados de conta
-│   └── services_manager.py               # Factory de serviços
-│
-│
-└── env/                                  # Configuração
-    ├── keys.py                           # Chaves 
-    └── __init__.py
+▼
+Usuário
 ```
 
----
+### Divisão de Responsabilidades (Monorepo)
 
-## Tecnologias & Dependências
-
-| Tecnologia | Versão | Uso |
-|------------|--------|-----|
-| **Python** | 3.8+ | Linguagem base |
-| **python-binance** | Latest | SDK oficial Binance |
-| **pandas** | Latest | Estruturação e transformação de dados |
-
----
-
-## Padrões de Design Utilizados
-
-- **Factory Pattern**: `ServicesManager`, `ControllersManager`
-- **Separation of Concerns**: Camadas bem definidas
-- **Retry Pattern**: Resiliência com tentativas
-- **Error Handling**: Tratamento específico de exceções
+| Componente | Tecnologia | Papel no Ecossistema | Hospedagem |
+| :--- | :--- | :--- | :--- |
+| **Pipeline de Coleta** | Python (`uv`) | Worker diário para ingestão, validação de candles inéditos e registro de logs. | GitHub Actions |
+| **Banco de Dados** | Supabase | PostgreSQL persistente para séries históricas, indicadores, previsões e versionamento de modelos. | Supabase Cloud |
+| **Back-end** | FastAPI | Disponibilização de endpoints REST, documentação Swagger, cálculo de indicadores técnicos em tempo real e entrega de previsões. | Render |
+| **Machine Learning**| Scikit-Learn / Prophet | Scripts de treinamento (semanal/mensal) e geração de projeções diárias de preços. | GitHub Actions / Runner |
+| **Front-end** | React | Dashboard interativo para comparação de ativos, gráficos temporais e acompanhamento de performance dos modelos. | Vercel |
 
 ---
 
-## Licença
+## Tecnologias, Ferramentas & Padrões
 
-Este projeto foi desenvolvido como portfólio pessoal para demonstrar habilidades em Python, arquitetura de software e manipulação de dados.
+* **Linguagem Base:** Python 3.12+
+* **Gerenciador de Pacotes Python:** `uv` (Fast Python package installer & resolver)
+* **Validação de Ambiente:** Pydantic Settings (Gerenciamento de tipos via `.env`)
+* **Arquitetura do Código (Back-end):** Clean Architecture / 3-Tier (Split entre `Clients`, `Repositories`, `Services` e `Controllers`)
+* **Design Patterns:** Retry Pattern (Resiliência de conexões com a API), e Injeção de Dependências.
 
 ---
+
+## Funcionalidades da Plataforma
+
+### Ingestão & Pipeline de Dados
+* **Atualização Automática (Cron):** Ingestão diária via GitHub Actions capturando novos candles sem gerar duplicidade no banco.
+* **Resiliência a Falhas:** Lógica avançada de *retry* com backoff exponencial contra limites de rate-limit da API da Binance.
+* **Data Quality:** Validação de tipos e consistência estrutural antes da inserção no banco PostgreSQL.
+
+### Inteligência Artificial & Computação
+* **Predição de Séries Temporais:** Modelos estatísticos/ML atualizados periodicamente utilizando todo o histórico de dados limpos.
+* **Versionamento:** Rastreabilidade completa de métricas de performance (MAE, RMSE) por versão de modelo gerado.
+
+### Entrega de Dados (API Gateway)
+* **Endpoints REST:** Rotas otimizadas para puxar histórico de preços, status do mercado e as previsões futuras.
+* **Indicadores Técnicos:** Cálculo em tempo real de métricas como RSI (IFR), Médias Móveis (SMA/EMA) e Bandas de Bollinger.
+* **Documentação Viva:** Swagger e OpenAPI gerados dinamicamente para consumo facilitado.
+
+---
+
+## Estrutura do Monorepo
+
+```text
+crypto-market-platform/
+├── .github/
+│   └── workflows/
+│       └── daily_pipeline.yml       # Automação de coleta e predição diária
+├── back-end/                        # API REST (FastAPI)
+│   ├── app/
+│   │   ├── clients/                 # Conexões externas (Binance, Supabase)
+│   │   ├── controllers/             # Orquestração das rotas de entrada
+│   │   ├── repositories/            # Camada de persistência/consultas SQL
+│   │   └── services/                # Regras de negócio e cálculos matemáticos
+│   ├── main.py                      # Inicialização do servidor FastAPI
+│   ├── config.py                    # Classe de Settings Pydantic
+│   └── pyproject.toml               # Dependências da API via 'uv'
+├── front-end/                       # Dashboard Interativo (React)
+├── pipeline_coleta/                 # Scripts isolados do Worker de Ingestão
+└── ml_models/                       # Modelos preditivos, métricas e notebooks
+```
+
+## Instalação & Setup de Desenvolvimento
+Pré-requisitos
+
+* Python 3.12+ instalado.
+* Gerenciador uv instalado (pip install uv).
+
+## 1. Preparando o Back-end
+
+```Bash
+# Entrar na pasta do backend
+cd back-end
+```
+
+* Instalar dependências e criar ambiente virtual automaticamente via uv
+
+```Bash
+uv sync
+```
+
+## 2. Variáveis de Ambiente
+
+* Crie um arquivo .env na raiz do monorepo seguindo a estrutura abaixo:
+
+```Bash
+Snippet de código
+SUPABASE_URL=[https://seu-projeto.supabase.co](https://seu-projeto.supabase.co)
+SUPABASE_KEY=sua-chave-pública-supabase
+BINANCE_API_KEY=sua-api-key-da-binance
+BINANCE_API_SECRET=seu-secret-da-binance
+USE_TESTNET=True
+```
+
+## 3. Rodando a API Localmente
+
+```Bash
+uv run uvicorn app.main:app --reload
+Acesse a documentação interativa em: http://127.0.0.1:8000/docs
+```
+
+# Licença
+
+Este projeto está sendo desenvolvido como um portfólio avançado de Engenharia e Ciência de Dados, demonstrando habilidades com automação de infraestrutura, modelagem estatística e arquitetura escalável de software.
