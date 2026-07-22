@@ -35,6 +35,7 @@ class BinanceClient:
             self.client: Client = Client(
                 self.api_key, self.api_secret, testnet=self.test_net
             )
+            self.client.API_URL = "https://api1.binance.com/api"
             self.MAX_RETRIES = settings.MAX_RETRIES
             self.RETRY_DELAY = settings.RETRY_DELAY
             logger.info("BinanceClient inicializado com sucesso")
