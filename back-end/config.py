@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     BINANCE_API_KEY: str
     BINANCE_API_SECRET: str
     USE_TESTNET: bool = True
+    BINANCE_PROXY: str | None = None
 
     @field_validator("BINANCE_API_KEY", "BINANCE_API_SECRET", "SUPABASE_KEY")
     @classmethod

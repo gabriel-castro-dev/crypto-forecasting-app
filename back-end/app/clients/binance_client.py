@@ -33,7 +33,7 @@ class BinanceClient:
             self.api_secret: str = settings.BINANCE_API_SECRET
             self.test_net: bool = settings.USE_TESTNET
             self.client: Client = Client(
-                self.api_key, self.api_secret, testnet=self.test_net, tld="us"
+                self.api_key, self.api_secret, testnet=self.test_net
             )
             self.MAX_RETRIES = settings.MAX_RETRIES
             self.RETRY_DELAY = settings.RETRY_DELAY
