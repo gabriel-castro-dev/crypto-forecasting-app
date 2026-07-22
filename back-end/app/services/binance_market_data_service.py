@@ -178,7 +178,7 @@ class BinanceMarketService:
 
             df["symbol"] = df["symbol"].astype(str)
             cols = ["bidPrice", "bidQty", "askPrice", "askQty"]
-            # CORREÇÃO GLOBAL: Substituído astype por apply(pd.to_numeric) + dropna seguro
+
             df[cols] = df[cols].apply(pd.to_numeric, errors="coerce")
             df[cols] = df[cols].round(8)
             df = df.dropna(subset=cols)
@@ -232,7 +232,7 @@ class BinanceMarketService:
                 "Taker_Buy_Base_Asset_Volume",
                 "Taker_Buy_Quote_Asset_Volume",
             ]
-            # CORREÇÃO GLOBAL: Separação do dropna para evitar desalinhamento de linhas
+
             df[numeric_cols] = df[numeric_cols].apply(pd.to_numeric, errors="coerce")
             df[numeric_cols] = df[numeric_cols].round(8)
             df = df.dropna(subset=numeric_cols)
@@ -306,7 +306,7 @@ class BinanceMarketService:
                 "Taker_Buy_Base_Asset_Volume",
                 "Taker_Buy_Quote_Asset_Volume",
             ]
-            # CORREÇÃO GLOBAL: Substituído astype por apply(pd.to_numeric) e dropna seguro
+
             df[numeric_cols] = df[numeric_cols].apply(pd.to_numeric, errors="coerce")
             df[numeric_cols] = df[numeric_cols].round(8)
             df = df.dropna(subset=numeric_cols)
@@ -371,7 +371,7 @@ class BinanceMarketService:
                 "Taker_Buy_Base_Asset_Volume",
                 "Taker_Buy_Quote_Asset_Volume",
             ]
-            # CORREÇÃO GLOBAL: Substituído astype por apply(pd.to_numeric) e dropna seguro
+
             df[numeric_cols] = df[numeric_cols].apply(pd.to_numeric, errors="coerce")
             df[numeric_cols] = df[numeric_cols].round(8)
             df = df.dropna(subset=numeric_cols)
@@ -399,7 +399,6 @@ class BinanceMarketService:
             df = pd.DataFrame([data])
             df["mins"] = df["mins"].astype(str)
 
-            # CORREÇÃO GLOBAL: Uso correto do pd.to_numeric
             df["price"] = pd.to_numeric(df["price"], errors="coerce")
             df["price"] = df["price"].round(2)
             df = df.dropna(subset=["price"])
@@ -431,7 +430,6 @@ class BinanceMarketService:
             df = pd.DataFrame(data)
             df["id"] = df["id"].astype(int)
 
-            # CORREÇÃO GLOBAL: Substituído astype por casting correto e dropna combinado
             df["price"] = pd.to_numeric(df["price"], errors="coerce")
             df["price"] = df["price"].round(2)
 
@@ -472,7 +470,6 @@ class BinanceMarketService:
                 df.drop_duplicates(subset=["id"]).reset_index(drop=True).set_index("id")
             )
 
-            # CORREÇÃO GLOBAL: Substituído astype por casting correto e dropna combinado
             df["price"] = pd.to_numeric(df["price"], errors="coerce")
             df["price"] = df["price"].round(2)
 
@@ -527,7 +524,6 @@ class BinanceMarketService:
                 .set_index("Aggregate_Trade_Id")
             )
 
-            # CORREÇÃO GLOBAL: Substituído astype por casting correto e dropna combinado
             df["price"] = pd.to_numeric(df["price"], errors="coerce")
             df["price"] = df["price"].round(2)
 
@@ -571,7 +567,6 @@ class BinanceMarketService:
             df_full = pd.concat([df_bids, df_asks], ignore_index=True)
             df_full["lastUpdateId"] = update_id
 
-            # CORREÇÃO: Casting seguro de tipos numéricos usando apply(pd.to_numeric)
             df_full[["price", "quantity"]] = df_full[["price", "quantity"]].apply(
                 pd.to_numeric, errors="coerce"
             )

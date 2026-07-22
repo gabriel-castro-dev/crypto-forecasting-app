@@ -4,17 +4,17 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    MAX_RETRIES = 3
-    RETRY_DELAY = 5
+    MAX_RETRIES: int = 3
+    RETRY_DELAY: int = 5
     SUPABASE_URL: str
     SUPABASE_KEY: str
     BINANCE_API_KEY: str
     BINANCE_API_SECRET: str
     USE_TESTNET: bool = True
 
-    LOG_LEVEL = logging.INFO
-    LOG_FORMAT = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-    LOG_DATE_FORMAT = "%d/%m/%Y %H:%M:%S"
+    LOG_LEVEL: int = logging.INFO
+    LOG_FORMAT: str = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    LOG_DATE_FORMAT: str = "%d/%m/%Y %H:%M:%S"
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
