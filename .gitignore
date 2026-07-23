@@ -15,6 +15,7 @@ ENV/
 *.key
 *.secret
 *.pem
+*.act.secrets
 
 # ============================================================================
 # LOGS E CACHE
@@ -75,5 +76,6 @@ Thumbs.db
 .mypy_cache/
 .dmypy.json
 dmypy.json
+*.json
 *.bak
 *.tmp

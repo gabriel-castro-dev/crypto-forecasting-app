@@ -1,0 +1,78 @@
+name: Pipeline de Coleta de Dados Crypto (Docker)
+
+on:
+  schedule:
+    - cron: '0 * * * *'
+    - cron: '5 0 * * *'
+
+  workflow_dispatch:
+    inputs:
+      job_to_run:
+        description: 'Escolha qual rotina rodar manualmente'
+        required: true
+        default: 'hourly'
+        type: choice
+        options:
+          - hourly
+          - daily
+
+jobs:
+  hourly-job:
+    name: Executar Coleta Horária
+    if: |
+      github.event_name == 'workflow_dispatch' && github.event.inputs.job_to_run == 'hourly'
+      || github.event_name == 'schedule' && github.event.schedule == '0 * * * *'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Baixar Código do Repositório
+        uses: actions/checkout@v4
+
+      - name: Activar Cloudflare WARP (Bypass Geoblock)
+        uses: fscarmen/warp-on-actions@v1.4
+        with:
+          stack: dual
+          mode: wireguard
+
+      - name: Build da Imagem Docker
+        working-directory: back-end
+        run: docker build -t crypto-jobs -f Dockerfile.jobs .
+
+      - name: Rodar Job Horário
+        run: |
+          docker run \
+            -e SUPABASE_URL="${{ secrets.SUPABASE_URL }}" \
+            -e SUPABASE_KEY="${{ secrets.SUPABASE_KEY }}" \
+            -e BINANCE_API_KEY="${{ secrets.BINANCE_API_KEY }}" \
+            -e BINANCE_API_SECRET="${{ secrets.BINANCE_API_SECRET }}" \
+            crypto-jobs uv run python jobs.py hourly
+
+  daily-job:
+    name: Executar Coleta Diária
+    if: |
+      github.event_name == 'workflow_dispatch' && github.event.inputs.job_to_run == 'daily'
+      || github.event_name == 'schedule' && github.event.schedule == '5 0 * * *'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Baixar Código do Repositório
+        uses: actions/checkout@v4
+
+      - name: Activar Cloudflare WARP (Bypass Geoblock)
+        uses: fscarmen/warp-on-actions@v1.4
+        with:
+          stack: dual
+          mode: wireguard
+
+      - name: Build da Imagem Docker
+        working-directory: back-end
+        run: docker build -t crypto-jobs -f Dockerfile.jobs .
+
+      - name: Rodar Job Diário
+        run: |
+          docker run \
+            -e SUPABASE_URL="${{ secrets.SUPABASE_URL }}" \
+            -e SUPABASE_KEY="${{ secrets.SUPABASE_KEY }}" \
+            -e BINANCE_API_KEY="${{ secrets.BINANCE_API_KEY }}" \
+            -e BINANCE_API_SECRET="${{ secrets.BINANCE_API_SECRET }}" \
+            crypto-jobs uv run python jobs.py daily
