@@ -17,6 +17,37 @@ on:
           - daily
 
 jobs:
+  five-minutes-job:
+    name: Executar Coleta a Cada 5 Minutos
+    if: |
+      github.event_name == 'workflow_dispatch' && github.event.inputs.job_to_run == 'five-minutes'
+      || github.event_name == 'schedule' && github.event.schedule == '*/5 * * * *'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Baixar Código do Repositório
+        uses: actions/checkout@v4
+
+      - name: Activar Cloudflare WARP (Bypass Geoblock)
+        uses: fscarmen/warp-on-actions@v1.4
+        with:
+          stack: dual
+          mode: wireguard
+
+      - name: Build da Imagem Docker
+        working-directory: back-end
+        run: docker build -t crypto-jobs -f Dockerfile.jobs .
+
+      - name: Rodar Job a Cada 5 Minutos
+        run: |
+          docker run \
+            -e SUPABASE_URL="${{ secrets.SUPABASE_URL }}" \
+            -e SUPABASE_KEY="${{ secrets.SUPABASE_KEY }}" \
+            -e BINANCE_API_KEY="${{ secrets.BINANCE_API_KEY }}" \
+            -e BINANCE_API_SECRET="${{ secrets.BINANCE_API_SECRET }}" \
+            -e BINANCE_PROXY="${{ secrets.BINANCE_PROXY }}" \
+            crypto-jobs uv run python jobs.py five-minutes
+            
   hourly-job:
     name: Executar Coleta Horária
     if: |

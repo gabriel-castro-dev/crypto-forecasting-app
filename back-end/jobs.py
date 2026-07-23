@@ -7,9 +7,10 @@ def main():
     repo = CryptoForecastRepository()
     job_type = sys.argv[1] if len(sys.argv) > 1 else "hourly"
 
-    if job_type == "hourly":
+    if job_type == "five-minutes":
+        repo.save_orderbook_tickers()
+    elif job_type == "hourly":
         repo.save_ticker_24hr()
-        # repo.save_klines_1h()
     # elif job_type == "daily":
     # repo.save_klines_1d()
 
