@@ -11,8 +11,10 @@ def main():
         repo.save_orderbook_tickers()
     elif job_type == "hourly":
         repo.save_ticker_24hr()
-    # elif job_type == "daily":
-    # repo.save_klines_1d()
+    elif job_type == "daily":
+        repo.save_klines("15m")
+        repo.save_klines("1h")
+        repo.save_klines("1d")
 
 
 if __name__ == "__main__":

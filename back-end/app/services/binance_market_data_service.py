@@ -117,16 +117,16 @@ class BinanceMarketService:
         """
         df_tickers = self.get_tickers()
         symbols = df_tickers["symbol"].tolist()
-        data_list = []
+        all_data = []
 
         if not df_tickers.empty:
             for symbol in symbols:
                 data = self.client.get_ticker_24hr(symbol=symbol)
                 if isinstance(data, dict) and data:
-                    data_list.append(data)
+                    all_data.append(data)
 
-            if data_list:
-                df = pd.DataFrame(data_list)
+            if all_data:
+                df = pd.DataFrame(all_data)
                 ignorar_colunas = [
                     "symbol",
                     "openTime",
@@ -158,28 +158,45 @@ class BinanceMarketService:
             logger.error("Falha ao obter lista de tickers USDT")
             return pd.DataFrame()
 
+    def get_top_20_tickers(self) -> pd.DataFrame:
+        """
+        Obtém os 20 principais tickers USDT com base no volume.
+
+        Returns:
+            DataFrame com os 20 principais tickers ou DataFrame vazio se falhar
+        """
+        df_tickers = self.get_ticker_24hr()
+        if not df_tickers.empty:
+            sorted_df = df_tickers.sort_values(by="quoteVolume", ascending=False)
+            top_20 = sorted_df.head(20).reset_index(drop=True)
+            logger.info("Obtidos os 20 principais tickers USDT")
+            return top_20
+        else:
+            logger.error("Falha ao obter os 20 principais tickers USDT")
+            return pd.DataFrame(columns=["symbol"])
+
     def get_orderbook_tickers(self) -> pd.DataFrame:
         """
-        Obtém informações de order book dos pares USDT.
+        Obtém informações de order book dos top 20 pares USDT.
 
         Returns:
             DataFrame com dados de order book ou DataFrame vazio se falhar
         """
 
-        df_tickers = self.get_tickers()
+        df_tickers = self.get_top_20_tickers()
         symbols = df_tickers["symbol"].tolist()
-        data_list = []
+        all_data = []
 
         if not df_tickers.empty:
             for symbol in symbols:
                 data = self.client.get_orderbook_tickers(symbol=symbol)
                 if isinstance(data, dict) and data:
-                    data_list.append(data)
+                    all_data.append(data)
                     logger.info(f"Order book obtido para {symbol}")
                 else:
                     logger.error(f"Falha ao obter order book para {symbol}")
-        if data_list:
-            df = pd.DataFrame(data_list)
+        if all_data:
+            df = pd.DataFrame(all_data)
             df["symbol"] = df["symbol"].astype(str)
             cols = ["bidPrice", "bidQty", "askPrice", "askQty"]
 
@@ -193,19 +210,31 @@ class BinanceMarketService:
             logger.error(f"Falha ao obter order book para {len(symbols)} símbolos")
             return pd.DataFrame()
 
-    def get_klines(self, symbol: str, interval: str) -> pd.DataFrame:
+    def get_klines(self, interval: str) -> pd.DataFrame:
         """
-        Obtém K-lines (velas) em tempo real de um par.
+        Obtém K-lines (velas) em tempo real de todos os top 20 pares USDT.
 
         Args:
-            symbol: Par de moedas (ex: 'BTCUSDT')
             interval: Intervalo (ex: '1m', '1h', '1d')
 
         Returns:
             DataFrame com OHLCV ou DataFrame vazio se falhar
         """
-        data = self.client.get_klines(symbol=symbol, interval=interval)
-        if data:
+        df_tickers = self.get_top_20_tickers()
+        symbols = df_tickers["symbol"].tolist()
+        all_data = []
+
+        if not df_tickers.empty:
+            for symbol in symbols:
+                data = self.client.get_klines(symbol=symbol, interval=interval)
+                if isinstance(data, list) and data:
+                    for kline in data:
+                        all_data.append(kline + [symbol])
+                    logger.info(f"K-lines obtidas para {symbol} ({interval})")
+                else:
+                    logger.error(f"Falha ao obter k-lines para {symbol}")
+
+        if all_data:
             columns = [
                 "Open_Time",
                 "Open",
@@ -219,8 +248,9 @@ class BinanceMarketService:
                 "Taker_Buy_Base_Asset_Volume",
                 "Taker_Buy_Quote_Asset_Volume",
                 "Ignore",
+                "symbol",
             ]
-            df = pd.DataFrame(data=data, columns=columns)
+            df = pd.DataFrame(data=all_data, columns=columns)
             df = df.drop(columns=["Ignore"])
             df["Open_Time"] = pd.to_datetime(df["Open_Time"], unit="ms")
             df["Close_Time"] = pd.to_datetime(df["Close_Time"], unit="ms")
@@ -241,25 +271,25 @@ class BinanceMarketService:
             df[numeric_cols] = df[numeric_cols].round(8)
             df = df.dropna(subset=numeric_cols)
 
-            logger.info(f"Obtidas {len(df)} k-lines para {symbol} ({interval})")
+            logger.info(
+                f"Obtidas {len(df)} k-lines para {len(symbols)} símbolos ({interval})"
+            )
             return df
         else:
-            logger.error(f"Falha ao obter k-lines para {symbol}")
+            logger.error("Falha ao obter k-lines para os tickers USDT")
             return pd.DataFrame()
 
     def get_historical_klines(
         self,
-        symbol: str,
         interval: str,
         start_str: str,
         end_str: Optional[str] = None,
         limit: int = 1000,
     ) -> pd.DataFrame:
         """
-        Obtém K-lines históricas de um período específico.
+        Obtém K-lines históricas de um período específico para todos os top 20 pares USDT.
 
         Args:
-            symbol: Par de moedas (ex: 'BTCUSDT')
             interval: Intervalo (ex: '1h', '1d')
             start_str: Data inicial (ex: '10 days ago UTC')
             end_str: Data final (opcional)
@@ -268,14 +298,27 @@ class BinanceMarketService:
         Returns:
             DataFrame com k-lines históricas ou DataFrame vazio se falhar
         """
-        data = self.client.get_historical_klines(
-            symbol=symbol,
-            interval=interval,
-            start_str=start_str,
-            end_str=end_str,
-            limit=limit,
-        )
-        if data:
+        df_tickers = self.get_top_20_tickers()
+        symbols = df_tickers["symbol"].tolist()
+        all_data = []
+
+        if not df_tickers.empty:
+            for symbol in symbols:
+                data = self.client.get_historical_klines(
+                    symbol=symbol,
+                    interval=interval,
+                    start_str=start_str,
+                    end_str=end_str,
+                    limit=limit,
+                )
+                if isinstance(data, list) and data:
+                    for kline in data:
+                        all_data.append(kline + [symbol])
+                    logger.info(f"K-lines históricas obtidas para {symbol}")
+                else:
+                    logger.error(f"Falha ao obter k-lines históricas para {symbol}")
+
+        if all_data:
             columns = [
                 "Open_Time",
                 "Open",
@@ -289,73 +332,9 @@ class BinanceMarketService:
                 "Taker_Buy_Base_Asset_Volume",
                 "Taker_Buy_Quote_Asset_Volume",
                 "Ignore",
+                "symbol",
             ]
-            df = pd.DataFrame(data=data, columns=columns)
-            df = df.drop(columns=["Ignore"])
-            df["Open_Time"] = pd.to_datetime(df["Open_Time"], unit="ms").dt.strftime(
-                "%d/%m/%Y %H:%M:%S"
-            )
-            df["Close_Time"] = pd.to_datetime(df["Close_Time"], unit="ms").dt.strftime(
-                "%d/%m/%Y %H:%M:%S"
-            )
-            df["Number_of_Trades"] = df["Number_of_Trades"].astype(int)
-
-            numeric_cols = [
-                "Open",
-                "High",
-                "Low",
-                "Close",
-                "Volume",
-                "Quote_Asset_Volume",
-                "Taker_Buy_Base_Asset_Volume",
-                "Taker_Buy_Quote_Asset_Volume",
-            ]
-
-            df[numeric_cols] = df[numeric_cols].apply(pd.to_numeric, errors="coerce")
-            df[numeric_cols] = df[numeric_cols].round(8)
-            df = df.dropna(subset=numeric_cols)
-
-            logger.info(f"Obtidas {len(df)} k-lines históricas para {symbol}")
-            return df
-        else:
-            logger.error(f"Falha ao obter k-lines históricas para {symbol}")
-            return pd.DataFrame()
-
-    def get_historical_klines_generator(
-        self, symbol: str, interval: str, timestamp: str
-    ) -> pd.DataFrame:
-        """
-        Obtém K-lines históricas usando generator (eficiente para grandes volumes).
-
-        Args:
-            symbol: Par de moedas (ex: 'BTCUSDT')
-            interval: Intervalo (ex: '1h', '1d')
-            timestamp: Data inicial (ex: '100 days ago UTC')
-
-        Returns:
-            DataFrame com k-lines geradas ou DataFrame vazio se falhar
-        """
-        data = list(
-            self.client.get_historical_klines_generator(
-                symbol=symbol, interval=interval, start_str=timestamp
-            )
-        )
-        if data:
-            columns = [
-                "Open_Time",
-                "Open",
-                "High",
-                "Low",
-                "Close",
-                "Volume",
-                "Close_Time",
-                "Quote_Asset_Volume",
-                "Number_of_Trades",
-                "Taker_Buy_Base_Asset_Volume",
-                "Taker_Buy_Quote_Asset_Volume",
-                "Ignore",
-            ]
-            df = pd.DataFrame(data=data, columns=columns)
+            df = pd.DataFrame(data=all_data, columns=columns)
             df = df.drop(columns=["Ignore"])
             df["Open_Time"] = pd.to_datetime(df["Open_Time"], unit="ms").dt.strftime(
                 "%d/%m/%Y %H:%M:%S"
@@ -381,201 +360,94 @@ class BinanceMarketService:
             df = df.dropna(subset=numeric_cols)
 
             logger.info(
-                f"Geradas {len(df)} k-lines históricas para {symbol} via generator"
+                f"Obtidas {len(df)} k-lines históricas para {len(symbols)} símbolos"
             )
             return df
         else:
-            logger.error(f"Falha ao gerar k-lines históricas para {symbol}")
+            logger.error("Falha ao obter k-lines históricas para os tickers USDT")
             return pd.DataFrame()
 
-    def get_avg_price(self, symbol: str) -> pd.DataFrame:
-        """
-        Obtém preço médio de um par.
-
-        Args:
-            symbol: Par de moedas (ex: 'BTCUSDT')
-
-        Returns:
-            DataFrame com preço médio ou DataFrame vazio se falhar
-        """
-        data = self.client.get_avg_price(symbol=symbol)
-        if data:
-            df = pd.DataFrame([data])
-            df["mins"] = df["mins"].astype(str)
-
-            df["price"] = pd.to_numeric(df["price"], errors="coerce")
-            df["price"] = df["price"].round(2)
-            df = df.dropna(subset=["price"])
-
-            df["closeTime"] = pd.to_datetime(df["closeTime"], unit="ms").dt.strftime(
-                "%d/%m/%Y %H:%M:%S"
-            )
-            logger.info(f"Preço médio obtido para {symbol}")
-            return df
-        else:
-            logger.error(f"Falha ao obter preço médio para {symbol}")
-            return pd.DataFrame()
-
-    def get_recent_trades(
-        self, symbol: str, limit: Optional[int] = None
+    def get_historical_klines_generator(
+        self, interval: str, timestamp: str
     ) -> pd.DataFrame:
         """
-        Obtém trades recentes de um par.
+        Obtém K-lines históricas usando generator (eficiente para grandes volumes)
+        para os top 20 pares USDT.
 
         Args:
-            symbol: Par de moedas (ex: 'BTCUSDT')
-            limit: Número máximo de trades a retornar
+            interval: Intervalo (ex: '1h', '1d')
+            timestamp: Data inicial (ex: '100 days ago UTC')
 
         Returns:
-            DataFrame com trades recentes ou DataFrame vazio se falhar
+            DataFrame com k-lines geradas ou DataFrame vazio se falhar
         """
-        data = self.client.get_recent_trades(symbol=symbol, limit=limit)
-        if data:
-            df = pd.DataFrame(data)
-            df["id"] = df["id"].astype(int)
+        df_tickers = self.get_top_20_tickers()
+        symbols = df_tickers["symbol"].tolist()
+        all_data = []
 
-            df["price"] = pd.to_numeric(df["price"], errors="coerce")
-            df["price"] = df["price"].round(2)
+        if not df_tickers.empty:
+            for symbol in symbols:
+                data = list(
+                    self.client.get_historical_klines_generator(
+                        symbol=symbol, interval=interval, start_str=timestamp
+                    )
+                )
+                if isinstance(data, list) and data:
+                    for kline in data:
+                        all_data.append(kline + [symbol])
+                    logger.info(
+                        f"K-lines históricas geradas para {symbol} via generator"
+                    )
+                else:
+                    logger.error(f"Falha ao gerar k-lines históricas para {symbol}")
 
-            df[["qty", "quoteQty"]] = df[["qty", "quoteQty"]].apply(
-                pd.to_numeric, errors="coerce"
-            )
-            df[["qty", "quoteQty"]] = df[["qty", "quoteQty"]].round(8)
-            df = df.dropna(subset=["price", "qty", "quoteQty"])
-
-            df["time"] = pd.to_datetime(df["time"], unit="ms").dt.strftime(
+        if all_data:
+            columns = [
+                "Open_Time",
+                "Open",
+                "High",
+                "Low",
+                "Close",
+                "Volume",
+                "Close_Time",
+                "Quote_Asset_Volume",
+                "Number_of_Trades",
+                "Taker_Buy_Base_Asset_Volume",
+                "Taker_Buy_Quote_Asset_Volume",
+                "Ignore",
+                "symbol",
+            ]
+            df = pd.DataFrame(data=all_data, columns=columns)
+            df = df.drop(columns=["Ignore"])
+            df["Open_Time"] = pd.to_datetime(df["Open_Time"], unit="ms").dt.strftime(
                 "%d/%m/%Y %H:%M:%S"
             )
-            df[["isBuyerMaker", "isBestMatch"]] = df[
-                ["isBuyerMaker", "isBestMatch"]
-            ].astype(bool)
-
-            logger.info(f"Obtidos {len(df)} trades recentes para {symbol}")
-            return df
-        else:
-            logger.error(f"Falha ao obter trades recentes para {symbol}")
-            return pd.DataFrame()
-
-    def get_historical_trades(self, symbol: str) -> pd.DataFrame:
-        """
-        Obtém histórico de trades de um par.
-
-        Args:
-            symbol: Par de moedas (ex: 'BTCUSDT')
-
-        Returns:
-            DataFrame com trades históricos ou DataFrame vazio se falhar
-        """
-        data = self.client.get_historical_trades(symbol=symbol)
-        if data:
-            df = pd.DataFrame(data)
-            df["id"] = df["id"].astype(int)
-            df = (
-                df.drop_duplicates(subset=["id"]).reset_index(drop=True).set_index("id")
-            )
-
-            df["price"] = pd.to_numeric(df["price"], errors="coerce")
-            df["price"] = df["price"].round(2)
-
-            df[["qty", "quoteQty"]] = df[["qty", "quoteQty"]].apply(
-                pd.to_numeric, errors="coerce"
-            )
-            df[["qty", "quoteQty"]] = df[["qty", "quoteQty"]].round(8)
-            df = df.dropna(subset=["price", "qty", "quoteQty"])
-
-            df["time"] = pd.to_datetime(df["time"], unit="ms").dt.strftime(
+            df["Close_Time"] = pd.to_datetime(df["Close_Time"], unit="ms").dt.strftime(
                 "%d/%m/%Y %H:%M:%S"
             )
-            df[["isBuyerMaker", "isBestMatch"]] = df[
-                ["isBuyerMaker", "isBestMatch"]
-            ].astype(bool)
+            df["Number_of_Trades"] = df["Number_of_Trades"].astype(int)
 
-            logger.info(f"Obtidos {len(df)} trades históricos para {symbol}")
+            numeric_cols = [
+                "Open",
+                "High",
+                "Low",
+                "Close",
+                "Volume",
+                "Quote_Asset_Volume",
+                "Taker_Buy_Base_Asset_Volume",
+                "Taker_Buy_Quote_Asset_Volume",
+            ]
+
+            df[numeric_cols] = df[numeric_cols].apply(pd.to_numeric, errors="coerce")
+            df[numeric_cols] = df[numeric_cols].round(8)
+            df = df.dropna(subset=numeric_cols)
+
+            logger.info(
+                f"Geradas {len(df)} k-lines históricas para {len(symbols)} símbolos via generator"
+            )
             return df
         else:
-            logger.error(f"Falha ao obter trades históricos para {symbol}")
+            logger.error("Falha ao gerar k-lines históricas para os tickers USDT")
             return pd.DataFrame()
 
-    def get_aggregate_trades(self, symbol: str) -> pd.DataFrame:
-        """
-        Obtém agregação de trades de um par.
 
-        Args:
-            symbol: Par de moedas (ex: 'BTCUSDT')
-
-        Returns:
-            DataFrame com trades agregados ou DataFrame vazio se falhar
-        """
-        data = self.client.get_aggregate_trades(symbol=symbol)
-        if data:
-            df = pd.DataFrame(data)
-            df = df.rename(
-                columns={
-                    "a": "Aggregate_Trade_Id",
-                    "p": "price",
-                    "q": "Quantity",
-                    "f": "First_Trade_Id",
-                    "l": "Last_Trade_Id",
-                    "T": "TimeStamp",
-                    "m": "isBuyerMaker",
-                    "M": "isBestMatch",
-                }
-            )
-            df["Aggregate_Trade_Id"] = df["Aggregate_Trade_Id"].astype(int)
-            df = (
-                df.drop_duplicates(subset=["Aggregate_Trade_Id"])
-                .reset_index(drop=True)
-                .set_index("Aggregate_Trade_Id")
-            )
-
-            df["price"] = pd.to_numeric(df["price"], errors="coerce")
-            df["price"] = df["price"].round(2)
-
-            df["Quantity"] = pd.to_numeric(df["Quantity"], errors="coerce")
-            df["Quantity"] = df["Quantity"].round(8)
-            df = df.dropna(subset=["price", "Quantity"])
-
-            df[["First_Trade_Id", "Last_Trade_Id"]] = df[
-                ["First_Trade_Id", "Last_Trade_Id"]
-            ].astype(int)
-            df["TimeStamp"] = pd.to_datetime(df["TimeStamp"], unit="ms").dt.strftime(
-                "%d/%m/%Y %H:%M:%S"
-            )
-            df[["isBuyerMaker", "isBestMatch"]] = df[
-                ["isBuyerMaker", "isBestMatch"]
-            ].astype(bool)
-
-            logger.info(f"Obtidos {len(df)} trades agregados para {symbol}")
-            return df
-        else:
-            logger.error(f"Falha ao obter trades agregados para {symbol}")
-            return pd.DataFrame()
-
-    def get_depth(self, symbol: str) -> pd.DataFrame:
-        """
-        Obtém profundidade de mercado (order book depth) de um par.
-
-        Args:
-            symbol: Par de moedas (ex: 'BTCUSDT')
-
-        Returns:
-            DataFrame com profundidade ou DataFrame vazio se falhar
-        """
-        data = self.client.get_depth(symbol=symbol)
-        if data:
-            update_id = data.get("lastUpdateId")
-            df_bids = pd.DataFrame(data["bids"], columns=["price", "quantity"])
-            df_bids["side"] = "bid"
-            df_asks = pd.DataFrame(data["asks"], columns=["price", "quantity"])
-            df_asks["side"] = "ask"
-            df_full = pd.concat([df_bids, df_asks], ignore_index=True)
-            df_full["lastUpdateId"] = update_id
-
-            df_full[["price", "quantity"]] = df_full[["price", "quantity"]].apply(
-                pd.to_numeric, errors="coerce"
-            )
-            logger.info(f"Profundidade de mercado obtida para {symbol}")
-            return df_full
-        else:
-            logger.error(f"Falha ao obter profundidade de mercado para {symbol}")
-            return pd.DataFrame()
